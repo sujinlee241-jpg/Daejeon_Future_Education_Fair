@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>도형의 이동을 이용한 쪽매 맞춤(Tessellation)</title>
+    <!-- MathJax 수식 렌더링 라이브러리 -->
+    <script>
+        MathJax = {
+          tex: {
+            inlineMath: [['$', '$'], ['\\(', '\\)']],
+            displayMath: [['$$', '$$'], ['\\[', '\\]']]
+          }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body { 
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background: #f8f9fa; 
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h2 { 
+            margin-top: 0;
+            margin-bottom: 15px; 
+            color: #111; 
+            text-align: center;
+        }
+
+        /* 탭 네비게이션 스타일 */
+        .tab-nav {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            background: #e9ecef;
+            padding: 6px;
+            border-radius: 30px;
+        }
+        .tab-btn {
+            padding: 10px 24px;
+            font-size: 15px;
+            font-weight: bold;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            background: transparent;
+            color: #495057;
+            transition: all 0.2s ease;
+        }
+        .tab-btn.active {
+            background: #0056b3;
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(0, 86, 179, 0.3);
+        }
+
+        /* 탭 컨텐츠 영역 */
+        .tab-content {
+            display: none;
+            width: 100%;
+            max-width: 1280px;
+        }
+        .tab-content.active {
+            display: flex;
+        }
+
+        /* [탭 1] 메인 좌우 2단 레이아웃 */
+        .main-container {
+            flex-direction: row;
+            gap: 24px;
+            justify-content: center;
+            align-items: flex-start;
+            width: 100%;
+        }
+
+        /* 왼쪽: 시뮬레이터 영역 */
+        .simulator-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        canvas { 
+            background: #ffffff; 
+            border: 1px solid #ddd; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+            width: 100%;
+            height: auto;
+            transition: filter 0.3s ease;
+        }
+
+        .controls { 
+            margin-top: 15px; 
+            display: inline-block; 
+            text-align: left; 
+            background: #fff; 
+            padding: 15px 25px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05); 
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .control-group { margin: 10px 0; }
+        label { display: inline-block; width: 150px; font-weight: bold; }
+        .radio-label { width: auto; font-weight: normal; margin-right: 12px; cursor: pointer; }
+
+        /* 오른쪽: 수학적 설명 섹션 */
+        .math-section {
+            flex: 1;
+            max-width: 620px;
+            width: 100%;
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 25px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border-left: 5px solid #66B2FF;
+            text-align: left;
+            box-sizing: border-box;
+        }
+        .math-section h3, .steam-section h3 {
+            margin-top: 0;
+            color: #0056b3;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 8px;
+        }
+        .question-box {
+            background-color: #eef6ff;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin: 15px 0;
+            font-weight: bold;
+            color: #1a4971;
+            line-height: 1.5;
+        }
+        .formula-box {
+            background: #f1f3f5;
+            padding: 10px 15px;
+            border-radius: 6px;
+            text-align: center;
+            margin: 12px 0;
+            font-weight: bold;
+            overflow-x: auto;
+        }
+        ul { padding-left: 20px; line-height: 1.6; }
+        li { margin-bottom: 8px; }
+
+        /* [탭 2] STEAM 섹션 레이아웃 */
+        .steam-container {
+            flex-direction: row;
+            gap: 24px;
+            width: 100%;
+            justify-content: center;
+        }
+        .steam-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 25px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            box-sizing: border-box;
+        }
+        .prompt-box {
+            background: #212529;
+            color: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Pretendard', sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+            word-break: break-all;
+            margin: 10px 0;
+            position: relative;
+        }
+        .copy-btn {
+            background: #0056b3;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            float: right;
+        }
+        .copy-btn:hover { background: #004085; }
+        .select-style {
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #ced4da;
+            margin-top: 5px;
+            font-size: 14px;
+        }
+        .step-badge {
+            display: inline-block;
+            background: #e7f5ff;
+            color: #1971c2;
+            font-weight: bold;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 13px;
+            margin-right: 6px;
+        }
+
+        .preview-container {
+            margin-top: 15px;
+            text-align: center;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px dashed #ced4da;
+        }
+
+        /* 저장 버튼 스타일 */
+        .download-btn {
+            margin-top: 12px;
+            background: #2b8a3e;
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13.5px;
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.2s ease;
+        }
+        .download-btn:hover {
+            background: #216a30;
+        }
+
+        .guide-box {
+            margin-top: 10px;
+            padding: 12px;
+            background: #f1f3f5;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #343a40;
+            line-height: 1.5;
+        }
+
+        /* 반응형 디자인 */
+        @media (max-width: 992px) {
+            .main-container, .steam-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            .simulator-section, .math-section, .steam-card {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <h2>도형의 이동을 이용한 쪽매 맞춤(Tessellation)</h2>
+
+    <!-- 상단 탭 버튼 -->
+    <div class="tab-nav">
+        <button class="tab-btn active" onclick="switchTab('tab-math')">📐 [수학] 도형 이동 및 테셀레이션 탐구</button>
+        <button class="tab-btn" onclick="switchTab('tab-art')">🎨 [미술 연계 STEAM] AI 활용 예술적 변조</button>
+    </div>
+
+    <!-- [탭 1] 수학적 탐구 컨텐츠 -->
+    <div id="tab-math" class="tab-content active main-container">
+        <!-- 왼쪽: 시뮬레이터 -->
+        <div class="simulator-section">
+            <canvas id="canvas" width="600" height="600"></canvas>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <label>기본 도형 선택:</label>
+                    <input type="radio" name="shape" value="triangle" id="tri" onchange="draw()"><label for="tri" class="radio-label">삼각형</label>
+                    <input type="radio" name="shape" value="square" id="sq" checked onchange="draw()"><label for="sq" class="radio-label">사각형</label>
+                    <input type="radio" name="shape" value="pentagon" id="pent" onchange="draw()"><label for="pent" class="radio-label">오각형</label>
+                    <input type="radio" name="shape" value="hexagon" id="hex" onchange="draw()"><label for="hex" class="radio-label">육각형</label>
+                </div>
+                <div class="control-group">
+                    <label for="amp">Amplitude (진폭):</label>
+                    <input type="range" id="amp" min="0" max="0.18" step="0.01" value="0.08" oninput="draw()">
+                    <span id="ampVal">0.08</span>
+                </div>
+                <div class="control-group">
+                    <label for="freq">Frequency (진동수):</label>
+                    <input type="range" id="freq" min="1" max="4" step="1" value="1" oninput="draw()">
+                    <span id="freqVal">1</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 오른쪽: 수학적 개념 및 원리 -->
+        <div class="math-section">
+            <h3>📐 테셀레이션과 정다각형의 수학적 원리</h3>
+            
+            <p><strong>1. 테셀레이션(Tessellation, 쪽매맞춤)이란?</strong><br>
+            동일한 모양의 도형을 이용해 평면을 빈틈(gap)이나 겹침(overlap) 없이 완전히 채우는 기하학적 배치를 의미합니다. 평행이동, 회전이동, 대칭이동 등의 <strong>도형의 이동</strong> 기법이 핵심적 원리로 사용됩니다.</p>
+
+            <div class="question-box">
+                ❓ 질문: 평면을 빈틈없이, 중복되지 않게 채우려면 어떤 정다각형으로 채워야 할까?
+            </div>
+
+            <p><strong>2. 한 꼭짓점에서의 내각의 합 = $360^\circ$</strong><br>
+            평면을 빈틈없이 채우기 위해서는 한 꼭짓점에 모이는 정다각형들의 내각의 합이 정확히 <strong>$360^\circ$</strong>가 되어야 합니다.</p>
+
+            <p>정$n$각형의 한 내각의 크기 공식을 사용해, 한 꼭짓점에 모이는 정$n$각형의 개수를 $m$이라 하면 다음 조건을 만족해야 합니다:</p>
+            
+            <div class="formula-box">
+                $$m \times \left[ \frac{180^\circ \times (n - 2)}{n} \right] = 360^\circ$$
+            </div>
+
+            <p>이식을 정돈하면 아래와 같은 부정방정식이 도출됩니다:</p>
+            
+            <div class="formula-box">
+                $$(n - 2)(m - 2) = 4$$
+            </div>
+
+            <p><strong>3. 자격이 있는 정다각형 ($n, m \ge 3$ 인 자연수 해)</strong></p>
+            <ul>
+                <li><strong>정삼각형 ($n=3$):</strong> 한 내각 $60^\circ$ $\rightarrow$ 한 꼭짓점에 <strong>6개</strong> 모임 ($60^\circ \times 6 = 360^\circ$)</li>
+                <li><strong>정사각형 ($n=4$):</strong> 한 내각 $90^\circ$ $\rightarrow$ 한 꼭짓점에 <strong>4개</strong> 모임 ($90^\circ \times 4 = 360^\circ$)</li>
+                <li><strong>정육각형 ($n=6$):</strong> 한 내각 $120^\circ$ $\rightarrow$ 한 꼭짓점에 <strong>3개</strong> 모임 ($120^\circ \times 3 = 360^\circ$)</li>
+            </ul>
+
+            <p>💡 <strong>왜 정오각형은 안 될까요?</strong><br>
+            정오각형의 한 내각은 $108^\circ$입니다. $108^\circ \times 3 = 324^\circ$ (빈틈 발생), $108^\circ \times 4 = 432^\circ$ (포개어짐)가 되어 $360^\circ$의 약수가 되지 못하므로, 정오각형 단독으로는 평면을 채울 수 없습니다.</p>
+        </div>
+    </div>
+
+    <!-- [탭 2] STEAM 미술 & AI 융합 컨텐츠 -->
+    <div id="tab-art" class="tab-content steam-container">
+        <!-- 왼쪽 카드: 예술적 테마 및 맞춤형 AI 프롬프트 생성기 -->
+        <div class="steam-card" style="flex: 1; max-width: 600px;">
+            <h3>🖼️ STEAM 수업: AI 맞춤 프롬프트 생성기</h3>
+            <p>수학적으로 만든 테셀레이션 윤곽선에 미술적 화풍을 더할 수 있도록 **생성형 AI 프롬프트**를 자동 생성합니다.</p>
+
+            <div class="control-group">
+                <label>🌐 프롬프트 언어 선택:</label>
+                <input type="radio" name="promptLang" value="ko" id="langKo" checked onchange="updatePrompt()"><label for="langKo" class="radio-label">한글</label>
+                <input type="radio" name="promptLang" value="en" id="langEn" onchange="updatePrompt()"><label for="langEn" class="radio-label">영어 (English)</label>
+            </div>
+
+            <div class="control-group" style="margin-top: 15px;">
+                <label for="artTheme">🎨 예술 화풍 / 테마 선택:</label>
+                <select id="artTheme" class="select-style" onchange="updatePrompt()">
+                    <option value="escher">에스허르(M.C. Escher) 스타일 판화</option>
+                    <option value="dancheong">한국 전통 단청 및 민화 패턴</option>
+                    <option value="stained_glass">화려한 고딕 성당 스탠드글라스</option>
+                    <option value="cyberpunk">사이버펑크 네온 아트</option>
+                    <option value="watercolor">부드럽고 몽환적인 파스텔 수채화</option>
+                    <option value="botanical">자연 보타니컬 나뭇잎 테셀레이션</option>
+                </select>
+            </div>
+
+            <div class="control-group" style="margin-top: 15px;">
+                <label for="subjectSelect">🐾 쪽매 형상 모티브:</label>
+                <select id="subjectSelect" class="select-style" onchange="updatePrompt()">
+                    <option value="birds_fish">새와 물고기</option>
+                    <option value="lizards">도마뱀과 파충류</option>
+                    <option value="flowers">꽃과 잎사귀</option>
+                    <option value="dragons">기하학적 용(Dragon)</option>
+                    <option value="waves">풍요로운 파도와 구름 문양</option>
+                </select>
+            </div>
+
+            <p style="margin-top: 20px; font-weight: bold; color: #0056b3;">✨ 자동 생성된 AI 프롬프트:</p>
+            <div class="prompt-box">
+                <button class="copy-btn" onclick="copyPrompt()">복사</button>
+                <span id="generatedPrompt">로딩 중...</span>
+            </div>
+
+            <!-- 언어 선택에 맞게 변경되는 추천 AI 및 안내 박스 -->
+            <div id="promptGuide" class="guide-box">
+                <!-- JS에서 동적 업데이트 -->
+            </div>
+
+            <div style="margin-top: 15px; padding: 12px; background: #f8f9fa; border-radius: 6px; border: 1px dashed #adb5bd;">
+                <strong>📥 기본 윤곽선 이미지 추출 및 참고</strong><br>
+                <span style="font-size: 12.5px; color: #495057;">오른쪽 미리보기 캔버스의 [이미지 저장] 버튼을 누르거나 우클릭하여 저장한 뒤, AI 서비스의 <strong>Image-to-Image(구도 참조)</strong> 기능을 함께 사용하면 원본 기하학 형태를 정확히 유지할 수 있습니다.</span>
+            </div>
+        </div>
+
+        <!-- 오른쪽 카드: 미술 질감 시뮬레이션 및 미리보기 -->
+        <div class="steam-card" style="flex: 1; max-width: 620px;">
+            <h3>🎭 미술 질감 시뮬레이션 & 미리보기</h3>
+
+            <div class="control-group">
+                <label for="canvasFilter" style="width: 160px;">🎨 캔버스 질감 효과 선택:</label>
+                <select id="canvasFilter" class="select-style" onchange="applyCanvasFilter()">
+                    <option value="none">원본 (기본)</option>
+                    <option value="sepia(0.7) contrast(1.3) brightness(0.95)">빈티지 목판화 (Sepia Woodcut)</option>
+                    <option value="hue-rotate(190deg) saturate(2.5) contrast(1.2)">사이버펑크 네온 (Neon Invert)</option>
+                    <option value="contrast(1.6) brightness(0.9) saturate(1.8)">강렬한 스탠드글라스 (Stained Glass)</option>
+                    <option value="grayscale(1) contrast(2) brightness(1.1)">흑백 수묵/민화 (Monochrome Ink)</option>
+                    <option value="saturate(1.8) hue-rotate(320deg) brightness(1.05)">몽환적 파스텔 톤 (Soft Pastel)</option>
+                </select>
+            </div>
+
+            <!-- 실시간 미리보기 전용 캔버스 -->
+            <div class="preview-container">
+                <p style="margin: 0 0 10px 0; font-size: 13px; font-weight: bold; color: #495057;">[ 실시간 질감 적용 미리보기 ]</p>
+                <canvas id="previewCanvas" width="500" height="500" style="width: 100%; max-width: 420px;"></canvas>
+                
+                <!-- ⭐ 새로 추가된 미술 미리보기 이미지 저장 버튼 -->
+                <div>
+                    <button class="download-btn" onclick="downloadPreviewImage()">
+                        📥 미리보기 테셀레이션 이미지 저장 (PNG)
+                    </button>
+                </div>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid #e9ecef; margin: 20px 0;">
+
+            <p style="font-weight: bold; color: #0056b3;">📌 STEAM 미술 연계 수업 가이드</p>
+            <p style="font-size: 13.5px; line-height: 1.5; margin-bottom: 6px;"><span class="step-badge">1</span> <strong>[수학]</strong> 쪽매맞춤 기하학적 구조 조절</p>
+            <p style="font-size: 13.5px; line-height: 1.5; margin-bottom: 6px;"><span class="step-badge">2</span> <strong>[미술]</strong> 질감 선택으로 색조 및 필터 실시간 탐색 및 이미지 다운로드</p>
+            <p style="font-size: 13.5px; line-height: 1.5; margin-bottom: 6px;"><span class="step-badge">3</span> <strong>[AI]</strong> 적합한 언어의 프롬프트를 선택·복사하여 생성형 AI에 입력 후 작품 완성</p>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const previewCtx = previewCanvas.getContext('2d');
+
+        const colors = ['#FF9999', '#66B2FF', '#99FF99', '#FFCC99', '#E6B800', '#C2C2F0', '#FFB3E6', '#C4E17F'];
+
+        // 탭 전환
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            if(tabId === 'tab-math') {
+                document.querySelectorAll('.tab-btn')[0].classList.add('active');
+            } else {
+                document.querySelectorAll('.tab-btn')[1].classList.add('active');
+            }
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        // 변형 변 계산
+        function getDeformedEdge(v1, v2, amp, freq, numPoints = 30) {
+            let pts = [];
+            let dx = v2.x - v1.x, dy = v2.y - v1.y;
+            let len = Math.hypot(dx, dy);
+            let norm = { x: -dy / len, y: dx / len };
+            for (let i = 0; i <= numPoints; i++) {
+                let t = i / numPoints;
+                let f = amp * Math.sin(2 * Math.PI * freq * t);
+                pts.push({
+                    x: (1 - t) * v1.x + t * v2.x + f * norm.x,
+                    y: (1 - t) * v1.y + t * v2.y + f * norm.y
+                });
+            }
+            return pts;
+        }
+
+        // 메인 그려주기 (메인 캔버스 + 미리보기 캔버스 동시 업데이트)
+        function draw() {
+            const shape = document.querySelector('input[name="shape"]:checked').value;
+            const amp = parseFloat(document.getElementById('amp').value);
+            const freq = parseInt(document.getElementById('freq').value);
+
+            document.getElementById('ampVal').innerText = amp.toFixed(2);
+            document.getElementById('freqVal').innerText = freq;
+
+            // 1. 메인 캔버스 렌더링
+            renderTessellation(canvas, ctx, shape, amp, freq);
+            // 2. 미술 탭 미리보기 캔버스 렌더링
+            renderTessellation(previewCanvas, previewCtx, shape, amp, freq);
+
+            updatePrompt();
+        }
+
+        function renderTessellation(cvs, targetCtx, shape, amp, freq) {
+            targetCtx.clearRect(0, 0, cvs.width, cvs.height);
+            targetCtx.save();
+            targetCtx.translate(cvs.width / 2, cvs.height / 2);
+
+            switch (shape) {
+                case 'triangle': drawTriangle(targetCtx, amp, freq); break;
+                case 'square': drawSquare(targetCtx, amp, freq); break;
+                case 'pentagon': drawPentagon(targetCtx, amp, freq); break;
+                case 'hexagon': drawHexagon(targetCtx, amp, freq); break;
+            }
+            targetCtx.restore();
+        }
+
+        function drawTriangle(targetCtx, amp, freq) {
+            const scale = 110;
+            const V0 = {x: 0, y: 0}, V1 = {x: 1, y: 0}, V2 = {x: 0.5, y: Math.sqrt(3)/2};
+
+            let c0 = getDeformedEdge(V0, V1, amp, freq);
+            let c1 = getDeformedEdge(V1, V2, amp, freq);
+            let c2 = getDeformedEdge(V2, V0, amp, freq);
+
+            let triUp = [...c0, ...c1, ...c2];
+            let c1Rev = c1.slice().reverse();
+            let c2RevTrans = c2.slice().reverse().map(p => ({x: p.x + V1.x, y: p.y + V1.y}));
+            let c0RevTrans = c0.slice().reverse().map(p => ({x: p.x + V2.x, y: p.y + V2.y}));
+            let triDn = [...c1Rev, ...c2RevTrans, ...c0RevTrans];
+
+            let u = V1, v = V2;
+            let cIdx = 0;
+
+            for (let i = -3; i <= 2; i++) {
+                for (let j = -3; j <= 2; j++) {
+                    let shiftX = i * u.x + j * v.x - 0.5;
+                    let shiftY = i * u.y + j * v.y - 0.4;
+
+                    renderPolygon(targetCtx, triUp, shiftX, shiftY, scale, colors[cIdx % colors.length]);
+                    cIdx++;
+                    renderPolygon(targetCtx, triDn, shiftX, shiftY, scale, colors[cIdx % colors.length]);
+                    cIdx++;
+                }
+            }
+        }
+
+        function drawSquare(targetCtx, amp, freq) {
+            const scale = 100;
+            const N = 40;
+            let tile = [];
+            for(let i=0; i<=N; i++) { let t = i/N; tile.push({x: t, y: amp * Math.sin(2 * Math.PI * freq * t)}); }
+            for(let i=0; i<=N; i++) { let t = i/N; tile.push({x: 1 + amp * Math.sin(2 * Math.PI * freq * t), y: t}); }
+            for(let i=0; i<=N; i++) { let t = 1 - i/N; tile.push({x: t, y: 1 + amp * Math.sin(2 * Math.PI * freq * t)}); }
+            for(let i=0; i<=N; i++) { let t = 1 - i/N; tile.push({x: amp * Math.sin(2 * Math.PI * freq * t), y: t}); }
+
+            let cIdx = 0;
+            for(let dx = -3; dx <= 2; dx++) {
+                for(let dy = -3; dy <= 2; dy++) {
+                    renderPolygon(targetCtx, tile, dx - 0.5, dy - 0.5, scale, colors[cIdx % colors.length]);
+                    cIdx++;
+                }
+            }
+        }
+
+        function drawPentagon(targetCtx, amp, freq) {
+            const scale = 80;
+            const V0 = {x:0, y:0}, V1 = {x:1, y:0}, V2 = {x:1, y:1}, V3 = {x:0.5, y:1.5}, V4 = {x:0, y:1};
+
+            let c0 = getDeformedEdge(V0, V1, amp, freq);
+            let c1 = getDeformedEdge(V1, V2, amp, freq);
+            let c2 = getDeformedEdge(V2, V3, amp, freq);
+            let c3 = getDeformedEdge(V3, V4, amp, freq);
+            let c4 = getDeformedEdge(V4, V0, amp, freq);
+
+            let pentUp = [...c0, ...c1, ...c2, ...c3, ...c4];
+            let pentDn = pentUp.slice().reverse().map(p => ({ x: 1 - p.x, y: 2 - p.y }));
+
+            let u = {x: 1, y: 0}, v = {x: 0, y: 2};
+            let cIdx = 0;
+
+            for (let i = -3; i <= 2; i++) {
+                for (let j = -2; j <= 1; j++) {
+                    let shiftX = i * u.x + j * v.x - 0.5;
+                    let shiftY = i * u.y + j * v.y - 1.0;
+
+                    renderPolygon(targetCtx, pentUp, shiftX, shiftY, scale, colors[cIdx % colors.length]);
+                    cIdx++;
+                    renderPolygon(targetCtx, pentDn, shiftX, shiftY, scale, colors[cIdx % colors.length]);
+                    cIdx++;
+                }
+            }
+        }
+
+        function drawHexagon(targetCtx, amp, freq) {
+            const scale = 75;
+            const R = 1.0;
+            let V = [];
+            for(let a=0; a<360; a+=60) {
+                let rad = a * Math.PI / 180;
+                V.push({x: R * Math.cos(rad), y: R * Math.sin(rad)});
+            }
+
+            let c0 = getDeformedEdge(V[0], V[1], amp, freq);
+            let c1 = getDeformedEdge(V[1], V[2], amp, freq);
+            let c2 = getDeformedEdge(V[2], V[3], amp, freq);
+
+            let c3 = c0.slice().reverse().map(p => ({x: p.x + (V[3].x - V[1].x), y: p.y + (V[3].y - V[1].y)}));
+            let c4 = c1.slice().reverse().map(p => ({x: p.x + (V[4].x - V[2].x), y: p.y + (V[4].y - V[2].y)}));
+            let c5 = c2.slice().reverse().map(p => ({x: p.x + (V[5].x - V[3].x), y: p.y + (V[5].y - V[3].y)}));
+
+            let tile = [...c0, ...c1, ...c2, ...c3, ...c4, ...c5];
+            let u = {x: V[0].x + V[1].x, y: V[0].y + V[1].y};
+            let v = {x: V[1].x + V[2].x, y: V[1].y + V[2].y};
+
+            let cIdx = 0;
+            for(let i = -3; i <= 3; i++) {
+                for(let j = -3; j <= 3; j++) {
+                    let shiftX = i * u.x + j * v.x;
+                    let shiftY = i * u.y + j * v.y;
+                    renderPolygon(targetCtx, tile, shiftX, shiftY, scale, colors[cIdx % colors.length]);
+                    cIdx++;
+                }
+            }
+        }
+
+        function renderPolygon(targetCtx, pts, shiftX, shiftY, scale, color) {
+            targetCtx.beginPath();
+            pts.forEach((pt, idx) => {
+                let px = (pt.x + shiftX) * scale;
+                let py = -(pt.y + shiftY) * scale;
+                if (idx === 0) targetCtx.moveTo(px, py); else targetCtx.lineTo(px, py);
+            });
+            targetCtx.closePath();
+            targetCtx.fillStyle = color;
+            targetCtx.fill();
+            targetCtx.strokeStyle = '#333';
+            targetCtx.lineWidth = 1.2;
+            targetCtx.stroke();
+        }
+
+        // 언어별 AI 프롬프트 동적 생성 및 안내 문구 업데이트
+        function updatePrompt() {
+            const shapeVal = document.querySelector('input[name="shape"]:checked').value;
+            const theme = document.getElementById('artTheme').value;
+            const subjectVal = document.getElementById('subjectSelect').value;
+            const lang = document.querySelector('input[name="promptLang"]:checked').value;
+
+            if (lang === 'ko') {
+                const shapeMap = { triangle: '정삼각형', square: '정사각형', pentagon: '정오각형', hexagon: '정육각형' };
+                const subjectMap = {
+                    birds_fish: '서로 자연스럽게 맞물린 새와 물고기 형상',
+                    lizards: '기하학적으로 조화를 이루는 도마뱀과 파충류',
+                    flowers: '연속적으로 피어나는 화려한 꽃과 잎사귀',
+                    dragons: '동양적인 기하학 구조의 용(Dragon) 문양',
+                    waves: '풍요로움을 상징하는 전통 파도와 구름 패턴'
+                };
+                const themeMap = {
+                    escher: 'M.C. 에스허르 스타일의 목판화 기법, 정교하게 맞물리는 수학적 테셀레이션 아트',
+                    dancheong: '한국 전통 단청의 오방색과 민화 화풍, 화려하고 품격 있는 전통 문양 디자인',
+                    stained_glass: '고딕 양식 성당의 화려한 스탠드글라스, 스테인드글라스 유리를 투과하는 영롱한 빛과 검은 윤곽선',
+                    cyberpunk: '미래지향적인 사이버펑크 네온 아트, 어두운 배경 속 화려하게 빛나는 신스웨이브 그리드',
+                    watercolor: '부드럽고 몽환적인 파스텔 톤 수채화 그림, 자연스러운 종이 질감',
+                    botanical: '정교한 보타니컬 나뭇잎과 식물 일러스트, 자연의 유기적인 아름다움이 드러나는 패턴'
+                };
+
+                const shapeKor = shapeMap[shapeVal] || '정다각형';
+                const subjectKor = subjectMap[subjectVal];
+                const themeKor = themeMap[theme];
+
+                const promptText = `${shapeKor} 기하학 구조 바탕의 이음새 없는(seamless) 테셀레이션 패턴. 모티브: ${subjectKor}. 화풍: ${themeKor}. 여백 없이 반복되는 정교한 패턴 디자인, 고해상도 디지털 아트, 디테일한 윤곽선.`;
+                document.getElementById('generatedPrompt').innerText = promptText;
+
+                document.getElementById('promptGuide').innerHTML = `
+                    💡 <strong>[한글 추천 AI]</strong> 제미나이(Gemini), 나노 바나나 2, ChatGPT (DALL-E 3), 뤼튼(Wrtn), Bing Image Creator<br>
+                    <span style="font-size: 12px; color: #555;">한글 이해도가 높은 서비스들로, 문맥 중심의 한글 프롬프트를 직관적으로 구현합니다.</span>
+                `;
+            } else {
+                const shapeMap = { triangle: 'equilateral triangle', square: 'square', pentagon: 'pentagon', hexagon: 'hexagon' };
+                const subjectMap = {
+                    birds_fish: 'harmoniously arranged interlocking birds and fish shapes',
+                    lizards: 'geometrically arranged interlocking lizards and reptiles',
+                    flowers: 'continuously blooming elegant flowers and leaves',
+                    dragons: 'oriental geometric dragon patterns',
+                    waves: 'traditional ocean waves and cloud patterns'
+                };
+                const themeMap = {
+                    escher: 'M.C. Escher style woodcut print, intricately interlocking mathematical tessellation art',
+                    dancheong: 'Korean traditional Dancheong color palette and Minhwa style, ornate traditional pattern design',
+                    stained_glass: 'gothic cathedral stained glass style, vivid light shining through glass with dark lead outlines',
+                    cyberpunk: 'futuristic cyberpunk neon art, glowing synthwave grid on a dark background',
+                    watercolor: 'soft pastel watercolor painting style, smooth paper texture',
+                    botanical: 'detailed botanical leaf and plant illustration, organic nature pattern'
+                };
+
+                const shapeEn = shapeMap[shapeVal] || 'polygon';
+                const subjectEn = subjectMap[subjectVal];
+                const themeEn = themeMap[theme];
+
+                const promptText = `Seamless tessellation pattern based on ${shapeEn} geometry structure. Motif: ${subjectEn}. Style: ${themeEn}. Edge-to-edge repeating seamless pattern design, high resolution digital art, clean detailed outlines.`;
+                document.getElementById('generatedPrompt').innerText = promptText;
+
+                document.getElementById('promptGuide').innerHTML = `
+                    💡 <strong>[영어 추천 AI]</strong> Gemini, Nano Banana 2, Midjourney, Stable Diffusion, Leonardo.Ai, Bing<br>
+                    <span style="font-size: 12px; color: #555;">영문 프롬프트 입력 시 오번역 및 필터링 오류 없이 정교하고 세밀한 스타일을 연출합니다.</span>
+                `;
+            }
+        }
+
+        // 프롬프트 복사
+        function copyPrompt() {
+            const promptText = document.getElementById('generatedPrompt').innerText;
+            navigator.clipboard.writeText(promptText).then(() => {
+                alert("선택한 AI 프롬프트가 클립보드에 복사되었습니다!");
+            });
+        }
+
+        // 캔버스 필터 적용 (메인 및 미리보기 캔버스 모두 적용)
+        function applyCanvasFilter() {
+            const filterVal = document.getElementById('canvasFilter').value;
+            canvas.style.filter = filterVal;
+            previewCanvas.style.filter = filterVal;
+        }
+
+        // ⭐ [수정된 기능] 미술 미리보기 캔버스 저장 함수 (적용된 CSS 질감 필터까지 구워서 PNG 저장)
+        function downloadPreviewImage() {
+            const srcCanvas = document.getElementById('previewCanvas');
+            const filterVal = document.getElementById('canvasFilter').value;
+
+            // 임시 캔버스 생성 (CSS 필터 효과를 실제 이미지 데이터로 구워내기 위함)
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = srcCanvas.width;
+            tempCanvas.height = srcCanvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            // 필터가 적용되어 있다면 2D 컨텍스트 필터로 지정
+            if (filterVal && filterVal !== 'none') {
+                tempCtx.filter = filterVal;
+            }
+
+            // 원본 캔버스 그림 복사
+            tempCtx.drawImage(srcCanvas, 0, 0);
+
+            // 파일명에 타임스탬프 부여
+            const now = new Date();
+            const timeStr = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+            const fileName = `Tessellation_Art_${timeStr}.png`;
+
+            // 다운로드 실행
+            const link = document.createElement('a');
+            link.href = tempCanvas.toDataURL('image/png');
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // 초기 실행
+        draw();
+    </script>
+</body>
+</html>
